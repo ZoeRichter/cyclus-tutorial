@@ -7,6 +7,8 @@ import csv
 import collections
 import matplotlib.pyplot as plt
 import sqlite3 as lite
+import seaborn as sns
+from itertools import chain
 from itertools import cycle
 import matplotlib
 from matplotlib import cm
@@ -886,6 +888,224 @@ def plot_in_out_flux(
         plt.xlim(left=0.0)
         plt.ylim(bottom=0.0)
         plt.show()
+
+
+def get_tot_snf(cur):
+    """
+    Function takes raw snf data from sqlite db, then sorts
+    it into an snf df that gives the total mass of snf at
+    each time step.
+
+    Parameters:
+    cur: SQLite cursor
+
+    Returns:
+    snf: pandas dataframe
+
+    """
+    query = ("SELECT Time, Value FROM TimeSeriesUsedFuel")
+
+    rawsnf = pd.read_sql_query(query, cur)
+    snf = rawsnf.drop_duplicates()
+
+    dur = cur.execute("SELECT duration FROM info").fetchone()[0]
+    times = snf.Time.values
+
+    df = pd.DataFrame({'Total_Mass': np.zeros(dur + 1)})
+    snf = pd.concat([snf, df], axis=1)
+    snf = snf.drop(['Time', 'Value'], axis=1)
+
+    for t in times:
+        sumdmass = rawsnf.loc[(rawsnf.Time == t), 'Value'].sum()
+        snf.at[t, 'Total_Mass'] = sumdmass
+
+    mass = snf.loc[:, 'Total_Mass'].values
+    for i, _ in enumerate(mass[1:], start=1):
+        mass[i] += mass[i - 1]
+
+    snf.loc[:, 'Total_Mass'] = mass
+
+    return snf
+
+
+def get_iso_inventory(snf, cur):
+    """
+    Function adds a column for each isotope that gives its mass
+    value at each time step.
+
+    Parameters:
+    snf: pandas dataframe of total snf mass at each time step
+    cur: SQLite cursor to database
+
+    Returns:
+    snf_inv:
+    """
+    query = "SELECT Qualid FROM Recipes WHERE Recipe == 'spent-uox'"
+    qual = cur.execute(query).fetchone()[0]
+
+    query = "SELECT NucId, MassFrac FROM Compositions WHERE Qualid == (?)"
+    compositions = cur.execute(query, (qual,)).fetchall()
+
+    comp_dict = {}
+    tot_mass = snf.loc[:, 'Total_Mass'].values
+    for i, comp in enumerate(compositions):
+        name = nucname.name(comp[0])
+        comp_dict[name] = tot_mass * comp[1]
+
+    df = pd.DataFrame(comp_dict)
+    snf_inv = pd.concat([snf, df], axis=1)
+
+    return snf_inv
+
+
+def plot_snf_into_repo(cur):
+    """
+    Function plots the snf mass entering the repository
+    at each time step.
+
+    Parameters:
+    cur: SQLite cursor to database
+
+    Returns:
+    none, but produces a plot
+    """
+
+    snf = get_tot_snf(cur)
+
+    snf_inv = get_iso_inventory(snf, cur)
+
+    plt.rcParams["figure.figsize"] = (13, 9)
+    colors = ["#eecffe", "#720058", "#8ffe09", "#f36196", "#1b2431"]
+    pal = sns.color_palette(colors)
+
+    snf_inv.plot.area(color=pal)
+
+    plt.title('Cumulative SNF into Repository')
+    plt.xlabel('time [months]')
+    plt.ylabel('Cumulative SNF [kg]')
+    plt.show()
+
+
+def get_fuel_raw(cur):
+    """
+    Function pulls the raw fresh fuel data from the SQLite
+    database into a pandas dataframe
+
+    Parameters:
+    cur: SQLite cursor to database
+
+    Returns:
+    rawfuel: pandas database of raw fuel masses
+    """
+    query = "SELECT AgentId FROM AgentEntry WHERE Spec LIKE (?)"
+    agentid = cur.execute(query, ('%Reactor',)).fetchall()
+    agentid = list(chain.from_iterable(agentid))
+
+    placeholders = ', '.join('?' * len(agentid))
+    query = "SELECT ResourceId FROM Transactions " \
+            "WHERE ReceiverId IN ({})".format(placeholders)
+    resid = cur.execute(query, agentid).fetchall()
+    resid = list(chain.from_iterable(resid))
+
+    placeholders = ', '.join('?' * len(resid))
+    query = "SELECT TimeCreated as Time, Quantity FROM Resources " \
+            "WHERE ResourceId IN ({})".format(placeholders)
+    rawfuel = pd.read_sql_query(query, cur, params=resid)
+
+    return rawfuel
+
+
+def get_tot_fresh_fuel(rawfuel, cur):
+    """
+    Function takes raw fuel dataframe and formats it into
+    a fresh fuel dataframe with total mass at each time step.
+
+    Parameters:
+    rawfuel: raw snf pandas dataframe
+    cur: cursor to sql database
+
+    Returns:
+    ffuel: dataframe of total fresh fuel mass at each time step
+    """
+    ffuel = rawfuel.drop_duplicates()
+
+    dur = cur.execute("SELECT duration FROM info").fetchone()[0]
+    times = ffuel.Time.values
+
+    df = pd.DataFrame({'Total_Mass': np.zeros(dur + 1)})
+    ffuel = pd.concat([ffuel, df], axis=1)
+    ffuel = ffuel.drop(['Time', 'Quantity'], axis=1)
+
+    for t in times:
+        sumdmass = rawfuel.loc[(rawfuel.Time == t), 'Quantity'].sum()
+        ffuel.at[t, 'Total_Mass'] = sumdmass
+
+    mass = ffuel.loc[:, 'Total_Mass'].values
+    for i, _ in enumerate(mass[1:], start=1):
+        mass[i] += mass[i - 1]
+
+    ffuel.loc[:, 'Total_Mass'] = mass
+
+    return ffuel
+
+
+def get_fuel_iso(ffuel, cur):
+    """
+    Function takes a pandas dataframe of total fuel masses
+    and adds additional columns of the individual isotope
+    masses at each time step.
+
+    Parameters:
+    ffuel: pandas dataframe of total fresh fuel mass
+    cur: cursor to SQLite database
+
+    Returns:
+    ffuel: same dataframe, but with added columns
+    """
+    query = "SELECT Qualid FROM Recipes WHERE Recipe == 'fresh-uox'"
+    qual = cur.execute(query).fetchone()[0]
+
+    query = "SELECT NucId, MassFrac FROM Compositions WHERE Qualid == (?)"
+    compositions = cur.execute(query, (qual,)).fetchall()
+
+    comp_dict = {}
+    tot_mass = ffuel.loc[:, 'Total_Mass'].values
+    for i, comp in enumerate(compositions):
+        name = nucname.name(comp[0])
+        comp_dict[name] = tot_mass * comp[1]
+
+    df = pd.DataFrame(comp_dict)
+    ffuel = pd.concat([ffuel, df], axis=1)
+
+    return ffuel
+
+
+def plot_fuel_into_reactors(cur):
+    """
+    Function plots the fuel into reactors at each time step
+
+    Parameters:
+    cur: cursor to SQLite database
+
+    Returns:
+    none, but produces a plot
+    """
+    rawfuel = get_fuel_raw(cur)
+
+    ffuel_tot = get_tot_fresh_fuel(rawfuel, cur)
+
+    ffuel_inv = get_fuel_iso(ffuel_tot, cur)
+
+    plt.rcParams["figure.figsize"] = (13, 9)
+    colors = ["#eecffe", "#8ffe09", "#720058"]
+    pal = sns.color_palette(colors)
+
+    ffuel_inv.plot.area(color=pal)
+
+    plt.title('Cumulative Fuel into Reactors')
+    plt.xlabel('time [months]')
+    plt.ylabel('Cumulative Fuel [kg]')
+    plt.show()
 
 
 def u_util_calc(cur):

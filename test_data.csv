@@ -1,16 +1,16 @@
 Country,Reactor Name,Type,Net Electric Capacity,Operator
-The Beehive,Honeycomb3000,PWR,1000,SeveralBees
-The Beehive,Honeycomb3000,PWR,1500,SeveralBees
-The Beehive,Pollinator,BWR,1000,SeveralBees
-The Beehive,Honeycomb3000,PWR,1000,QueenBee
-The Beehive,Pollinator,BWR,1000,QueenBee
-The Beehive,Honeycomb3000,PWR,1000,QueenBee
-The Beehive,Honeycomb3000,PWR,1500,SeveralBees
-The Beehive,Pollinator,BWR,1000,SeveralBees
-The Beehive,Honeycomb3000,PWR,1000,SeveralBees
-The Other Beehive,Honeycomb3000,PWR,1500,SeveralBees
-The Other Beehive,Pollinator,BWR,1000,SeveralBees
-The Other Beehive,Honeycomb3000,PWR,1000,SeveralBees
-The Other Beehive,Honeycomb3000,PWR,1000,QueenBee
-The Other Beehive,Pollinator,BWR,1000,QueenBee
-The Other Beehive,Honeycomb3000,PWR,1000,QueenBee
+RegionA,ReactorA,PWR,1000,OperatorA
+RegionA,ReactorA,PWR,1500,OperatorA
+RegionA,ReactorB,BWR,1000,OperatorA
+RegionA,ReactorA,PWR,1000,OperatorB
+RegionA,ReactorB,BWR,1000,OperatorB
+RegionA,ReactorA,PWR,1000,OperatorB
+RegionA,ReactorA,PWR,1500,OperatorA
+RegionA,ReactorB,BWR,1000,OperatorA
+RegionA,ReactorA,PWR,1000,OperatorA
+RegionB,ReactorA,PWR,1500,OperatorA
+RegionB,ReactorB,BWR,1000,OperatorA
+RegionB,ReactorA,PWR,1000,OperatorA
+RegionB,ReactorA,PWR,1000,OperatorB
+RegionB,ReactorB,BWR,1000,OperatorB
+RegionB,ReactorA,PWR,1000,OperatorB

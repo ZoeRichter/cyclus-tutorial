@@ -1,11 +1,11 @@
 
 {% for country, operator in country_reactor_dict.items() -%}
-{% for operators, reactors in operator.items() -%}
 <region>
-  <name>{{country}}_{{operators}}</name>
+  <name>{{country}}_Reactors</name>
   <config>
     <NullRegion/>
   </config>
+  {% for operators, reactors in operator.items() -%}
   <institution>
     <initialfacilitylist>
       {% for reactor_name, reactor_info in reactors.items() -%}
@@ -15,14 +15,14 @@
       </entry>
       {% endfor -%}
     </initialfacilitylist>
-    <name>{{country}}_{{operators}}_Reactors</name>
+    <name>{{country}}_{{operators}}</name>
     <config>
       <NullInst/>
     </config>
   </institution>
+  {% endfor -%}
 </region>
 
-{% endfor -%}
 {% endfor -%}
 
 
